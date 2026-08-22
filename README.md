@@ -1,5 +1,9 @@
 # dsh-token-poker
 
+[![npm version](https://img.shields.io/npm/v/dsh-token-poker)](https://www.npmjs.com/package/dsh-token-poker)
+[![npm downloads](https://img.shields.io/npm/dm/dsh-token-poker)](https://www.npmjs.com/package/dsh-token-poker)
+[![license MIT](https://img.shields.io/npm/l/dsh-token-poker)](https://github.com/Dieight/dsh-token-poker/blob/main/LICENSE)
+
 **token-poker 的 DeepSeek Harness 移植版** —— Agent 陪玩的虚拟筹码德州扑克（Earn Tokens 风格）。
 
 > **衍生声明**：本项目是 [yzxoi/token-poker](https://github.com/yzxoi/token-poker)（其 README 声明 MIT）的独立移植仓库。牌局引擎与 AI 决策逻辑移植自上游；AI 对手改用 DSH LLM 服务；UI 以 React 18 重写并接入 DSH 主题；新增 DSH 插件层（host RPC 通道、设置命名空间、浏览器 bundle）。上游仓库当前未附带 LICENSE 文件，详见文末「版权」。
