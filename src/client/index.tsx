@@ -63,16 +63,18 @@ interface DshApiView {
         error?: { message?: string };
       };
     }>;
+    discoverModels(input: {
+      settingsNs: string;
+      provider?: string;
+      baseURL?: string;
+    }): Promise<{
+      result: {
+        ok: boolean;
+        value?: { models?: Array<{ id: string }> };
+        error?: { message?: string };
+      };
+    }>;
   };
-}
-
-function getPath(obj: unknown, path: string[]): unknown {
-  let cursor: unknown = obj;
-  for (const key of path) {
-    if (typeof cursor !== "object" || cursor === null) return undefined;
-    cursor = (cursor as Record<string, unknown>)[key];
-  }
-  return cursor;
 }
 
 const settingsZh = {
@@ -86,6 +88,8 @@ const settingsZh = {
   isolateScope: "会话隔离（每会话独立牌桌）",
   thinkTimeoutMs: "AI 思考超时 (ms)",
   providersError: "供应商目录加载失败",
+  modelsError: "模型加载失败",
+  selectModel: "请选择模型",
 };
 
 const settingsEn = {
@@ -100,6 +104,8 @@ const settingsEn = {
   isolateScope: "Isolate tables per session",
   thinkTimeoutMs: "AI think timeout (ms)",
   providersError: "Failed to load provider directory",
+  modelsError: "Failed to load models",
+  selectModel: "Select a model",
 };
 
 export function apply(ctx: Context): void {
@@ -148,8 +154,10 @@ export function apply(ctx: Context): void {
   }
 
   // Resolve DSH's configured provider directory: routes from
-  // `connection.api.llm.providers`, model lists from the settings describe
-  // mirror at the provider's settingsPath.
+  // `connection.api.llm.providers`, model lists fetched live from each
+  // provider's model discovery (`discoverModels`), the same call the Models
+  // settings page uses — so switching provider always shows that provider's
+  // own advertised models, not a stale static snapshot.
   async function loadProviders(): Promise<ProviderRow[]> {
     const apiProxy = connection.api;
     if (!apiProxy?.llm?.providers) return [];
@@ -161,41 +169,41 @@ export function apply(ctx: Context): void {
       provider?: string;
       displayName?: string;
       settingsNs?: string;
-      settingsPath?: string[];
       active?: boolean;
     }>;
-    const face = settingsScopeSvc?.describe?.();
-    await face?.ensure?.();
-    const view = face?.getSnapshot()?.view;
-    const namespaces = new Map(
-      (view?.namespaces ?? []).map((ns) => [ns.ns, ns.value]),
-    );
     return entries
       .filter((entry) => entry.provider && entry.active !== false)
-      .map((entry) => {
-        const nsValue = namespaces.get(entry.settingsNs ?? "");
-        const profile: unknown = entry.settingsPath?.length
-          ? getPath(nsValue, entry.settingsPath)
-          : undefined;
-        const profileRecord =
-          typeof profile === "object" && profile !== null
-            ? (profile as Record<string, unknown>)
-            : undefined;
-        const models = Array.isArray(profileRecord?.models)
-          ? (profileRecord.models as unknown[])
-              .map((model) =>
-                typeof model === "string"
-                  ? model
-                  : (model as { id?: string } | null)?.id,
-              )
-              .filter((id): id is string => typeof id === "string")
-          : [];
-        return {
-          provider: entry.provider as string,
-          displayName: entry.displayName || (entry.provider as string),
-          models,
-        };
-      });
+      .map((entry) => ({
+        provider: entry.provider as string,
+        displayName: entry.displayName || (entry.provider as string),
+        settingsNs: entry.settingsNs ?? "",
+      }));
+  }
+  async function loadProviderModels(provider: string): Promise<string[]> {
+    const apiProxy = connection.api;
+    if (!apiProxy?.llm?.providers || !provider) return [];
+    const response = await apiProxy.llm.providers({});
+    if (!response.result.ok) {
+      throw new Error(response.result.error?.message ?? "llm providers failed");
+    }
+    const entries = (response.result.value?.providers ?? []) as Array<{
+      provider?: string;
+      settingsNs?: string;
+    }>;
+    const entry = entries.find((candidate) => candidate.provider === provider);
+    if (!entry?.settingsNs || !apiProxy.llm.discoverModels) return [];
+    const discovered = await apiProxy.llm.discoverModels({
+      settingsNs: entry.settingsNs,
+      provider,
+    });
+    if (!discovered.result.ok) {
+      throw new Error(
+        discovered.result.error?.message ?? "model discovery failed",
+      );
+    }
+    return (discovered.result.value?.models ?? [])
+      .map((model) => model.id)
+      .filter((id): id is string => typeof id === "string");
   }
 
   // Mount the poker table as a conversation view tab (right of Context).
@@ -248,6 +256,7 @@ export function apply(ctx: Context): void {
                 setField: (field: string, value: unknown) =>
                   void settingsScope.set(field, value),
                 loadProviders,
+                loadProviderModels,
               }),
             },
             (props: unknown) =>

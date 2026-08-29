@@ -164,6 +164,7 @@ describe("PokerSettingsPanel", () => {
         }
         setField={() => {}}
         loadProviders={async () => []}
+        loadProviderModels={async () => []}
         t={(key) => key}
       />,
     );
@@ -185,6 +186,7 @@ describe("PokerSettingsPanel", () => {
         usePokerSettings={(select) => select({ status: "unavailable" })}
         setField={() => {}}
         loadProviders={async () => []}
+        loadProviderModels={async () => []}
         t={(key) => key}
       />,
     );

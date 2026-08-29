@@ -21,6 +21,28 @@ export function PokerPage({ api, scope }: PokerPageProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refreshInFlight = useRef(false);
+  const pageRef = useRef<HTMLElement | null>(null);
+
+  /**
+   * Scale the whole table UI to fit its container width. `zoom` is
+   * Chromium-native and scales every fixed-px dimension (fonts, positions,
+   * paddings) as one unit, keeping the layout intact; the container's own
+   * height auto-shrinks because zoom changes the element's used size.
+   */
+  useEffect(() => {
+    const host = pageRef.current?.parentElement ?? null;
+    if (!host) return;
+    const BASE_WIDTH = 1200;
+    const apply = () => {
+      const width = host.clientWidth;
+      const ratio = Math.min(1, width / BASE_WIDTH);
+      pageRef.current?.style.setProperty("--tp-scale", String(ratio));
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(host);
+    return () => ro.disconnect();
+  }, []);
 
   const applySnapshot = useCallback((snap: GameSnapshot) => {
     setSnapshot((prev) =>
@@ -140,7 +162,7 @@ export function PokerPage({ api, scope }: PokerPageProps) {
   };
 
   return (
-    <section className="tp-page" aria-label="德州扑克牌桌">
+    <section ref={pageRef} className="tp-page" aria-label="德州扑克牌桌">
       <header className="tp-header">
         <div className="tp-header__title">
           <span className="tp-header__name">No-Limit Inference</span>

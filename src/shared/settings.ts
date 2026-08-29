@@ -48,8 +48,8 @@ export interface ProviderRow {
   provider: string;
   /** Human display name from the directory. */
   displayName: string;
-  /** Model ids configured for this provider. */
-  models: string[];
+  /** Settings namespace owning this provider's model discovery. */
+  settingsNs: string;
 }
 
 export function isPokerSettings(value: unknown): value is PokerSettings {

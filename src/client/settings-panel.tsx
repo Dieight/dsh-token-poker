@@ -25,18 +25,55 @@ export interface PokerSettingsPanelProps {
   ) => unknown;
   /** Write one field into the namespace. */
   setField: (field: keyof PokerSettings, value: unknown) => void;
-  /** Resolve DSH's configured provider directory (async). */
+  /** Resolve DSH's configured provider directory (routes + display names). */
   loadProviders: () => Promise<ProviderRow[]>;
+  /** Resolve the current model list for one provider (fresh describe). */
+  loadProviderModels: (provider: string) => Promise<string[]>;
   /** Bound locale translator for the `settings.tokenPoker` namespace. */
   t: (key: string) => string;
 }
 
 export function PokerSettingsPanel(props: PokerSettingsPanelProps) {
-  const { usePokerSettings, setField, loadProviders, t } = props;
+  const {
+    usePokerSettings,
+    setField,
+    loadProviders,
+    loadProviderModels,
+    t,
+  } = props;
   const state = usePokerSettings((snapshot) => snapshot) as PokerSettingsSnapshot;
   const [providers, setProviders] = useState<ProviderRow[]>([]);
+  const [models, setModels] = useState<string[]>([]);
   const [providersBusy, setProvidersBusy] = useState(false);
   const [providersError, setProvidersError] = useState<string | null>(null);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+
+  // Refresh the provider's model list whenever the provider setting changes.
+  useEffect(() => {
+    let alive = true;
+    const provider = (state.value as Partial<PokerSettings> | undefined)?.provider;
+    if (!provider) {
+      setModels([]);
+      setModelsError(null);
+      return;
+    }
+    setModelsError(null);
+    loadProviderModels(provider)
+      .then((list) => {
+        if (!alive) return;
+        setModels(list);
+      })
+      .catch((error: unknown) => {
+        if (!alive) return;
+        setModels([]);
+        setModelsError(
+          error instanceof Error ? error.message : String(error),
+        );
+      });
+    return () => {
+      alive = false;
+    };
+  }, [loadProviderModels, state.value]);
 
   useEffect(() => {
     let alive = true;
@@ -66,8 +103,6 @@ export function PokerSettingsPanel(props: PokerSettingsPanelProps) {
     state.status === "error";
   const writable = !!state.writable && !busy;
 
-  const currentProvider = providers.find((row) => row.provider === v.provider);
-  const models = currentProvider?.models ?? [];
   const providerKnown = providers.some((row) => row.provider === v.provider);
 
   return (
@@ -93,7 +128,14 @@ export function PokerSettingsPanel(props: PokerSettingsPanelProps) {
             className="tp-settings__select"
             value={v.provider ?? ""}
             disabled={!writable || providersBusy}
-            onChange={(e) => setField("provider", e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              // Switching provider invalidates the previous model choice:
+              // clear it so the model picker shows the new provider's list
+              // instead of pretending the old model is still valid.
+              setField("provider", next);
+              if (v.model) setField("model", "");
+            }}
           >
             {providers.map((row) => (
               <option key={row.provider} value={row.provider}>
@@ -116,6 +158,11 @@ export function PokerSettingsPanel(props: PokerSettingsPanelProps) {
             disabled={!writable}
             onChange={(e) => setField("model", e.target.value)}
           >
+            {v.model ? null : (
+              <option value="" disabled>
+                {t("selectModel")}
+              </option>
+            )}
             {models.map((model) => (
               <option key={model} value={model}>
                 {model}
@@ -125,6 +172,11 @@ export function PokerSettingsPanel(props: PokerSettingsPanelProps) {
               <option value={v.model}>{v.model}</option>
             ) : null}
           </select>
+          {modelsError ? (
+            <span className="tp-settings__hint" title={modelsError}>
+              {t("modelsError")}
+            </span>
+          ) : null}
         </span>
       </div>
 

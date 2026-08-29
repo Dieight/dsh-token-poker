@@ -1,6 +1,6 @@
 {
   "name": "dsh-token-poker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Agent 陪玩的虚拟筹码德州扑克（Earn Tokens 风格）——token-poker 的 DeepSeek Harness 移植版",
   "author": "yzxoi (port: dsh)",
   "type": "module",
